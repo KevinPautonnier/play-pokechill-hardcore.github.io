@@ -8773,7 +8773,7 @@ function testAbility(target,id){
     if (areas[saved.currentArea]?.fieldEffect?.includes(field.moodyAura.id) && id == ability.moody.id) return true
 
 
-    if (saved.curry.time>0 && saved.curry.effect.includes(id)){
+    if (saved.curry?.time>0 && saved.curry?.effect.includes(id)){
         if ( ( areas[saved.currentArea]?.type == `event` && areas[saved.currentArea]?.difficulty>=tier1difficulty )
         || ( areas[saved.currentArea]?.type == `dimension` && areas[saved.currentArea]?.difficulty>=tier1difficulty ) ){
         return true
