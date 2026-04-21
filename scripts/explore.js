@@ -1541,7 +1541,8 @@ for (let i = activeBars; i < hpBars.length; i++) {
     for (const buff in wildBuffs){ if ( wildBuffs[buff]>0) wildBuffs[buff] = 0 }
     updateWildBuffs()
 
-    if (rng(0.20) && !areas[saved.currentArea]?.trainer && saved.currentArea != areas.frontierSpiralingTower.id && saved.currentArea != areas.training.id) dropItem()
+    const eggDropChance = saved.gamemodHard ? 0.05 : 0.20;
+    if (rng(eggDropChance) && !areas[saved.currentArea]?.trainer && saved.currentArea != areas.frontierSpiralingTower.id && saved.currentArea != areas.training.id) dropItem()
     //document.getElementById(`pkmn-movebox-wild-${exploreCombatWildTurn}-bar`).style.transition = "0s linear"
     //document.getElementById(`pkmn-movebox-wild-${exploreCombatWildTurn}-bar`).style.width = "0%";
 
