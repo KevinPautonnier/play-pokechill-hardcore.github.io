@@ -2955,7 +2955,7 @@ function exploreCombatPlayer() {
         if (testAbility("active",  ability.brittleArmor.id) ) moveBuff("wild",'satkup1',"self")
         }
 
-        if (attacker.shiny==true) totalPower *= 1.15
+        if (attacker.shiny==true) totalPower *= 1.25
 
 
 
