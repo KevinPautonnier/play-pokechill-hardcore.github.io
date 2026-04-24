@@ -654,6 +654,37 @@ function learnPkmnAbility(id,boost=1) {
     return pick;
 }
 
+// Déverrouille une abilité aléatoire supplémentaire pour le système de Redrop
+function unlockRedropAbility(pkmn_obj) {
+    if (!pkmn_obj.unlockedAbilities) {
+        pkmn_obj.unlockedAbilities = [pkmn_obj.ability];
+    }
+
+    const types = pkmn_obj.type;
+
+    // Générer une abilité aléatoire (toutes rarités)
+    let tier = random(1, 3);
+    
+    const pool = Object.keys(ability).filter(a => {
+        const ab = ability[a];
+        if (ab.rarity !== tier) return false;
+        if (ab.type == undefined) return false;
+        if (a == pkmn_obj.hiddenAbility?.id) return false
+        // Exclure les abilités déjà débloquées
+        if (pkmn_obj.unlockedAbilities.includes(a)) return false
+
+        return ab.type.includes("all") || ab.type.some(t => types.includes(t));
+    });
+
+    if (pool.length > 0) {
+        const newAbility = pool[Math.floor(Math.random() * pool.length)];
+        pkmn_obj.unlockedAbilities.push(newAbility);
+        return newAbility;
+    }
+    
+    return null;
+}
+
 
 document.getElementById('pokedex-menu').addEventListener('scroll', function() {
   const scrolled = this.scrollTop;

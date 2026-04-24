@@ -1,7 +1,6 @@
 
 
 
-
 function closePkmnEditor(){
 
     //setPkmnTeam()
@@ -20,6 +19,78 @@ function closePkmnEditor(){
 }
 
 
+
+// Fonctions pour le sélecteur d'abilité
+function openAbilitySelector(pkmnId) {
+    if (!pkmnId) return;
+    
+    const pkmn_obj = pkmn[pkmnId];
+    if (!pkmn_obj.unlockedAbilities || pkmn_obj.unlockedAbilities.length === 0) {
+        return;
+    }
+    
+    // Remplir la liste des abilités
+    const listDiv = document.getElementById("ability-selector-list");
+    listDiv.innerHTML = "";
+    
+    pkmn_obj.unlockedAbilities.forEach(abilityId => {
+        const btn = document.createElement("div");
+        btn.style.cssText = `
+            padding: 0.5rem;
+            background: var(--dark1);
+            border: 1px solid var(--light1);
+            border-radius: 0.3rem;
+            cursor: pointer;
+            color: var(--light2);
+            transition: all 0.2s;
+        `;
+        
+        let abilityTier = ``;
+        if (ability[abilityId].rarity == 2) abilityTier = ` ⭐`;
+        if (ability[abilityId].rarity == 3) abilityTier = ` ⭐⭐`;
+        
+        const isActive = abilityId === pkmn_obj.ability ? ' (Active)' : '';
+        btn.innerHTML = `<span>${format(abilityId)}${abilityTier}${isActive}</span>`;
+        
+        btn.addEventListener("mouseover", function() {
+            this.style.background = "var(--dark2)";
+            this.style.borderColor = "var(--light2)";
+        });
+        btn.addEventListener("mouseout", function() {
+            this.style.background = "var(--dark1)";
+            this.style.borderColor = "var(--light1)";
+        });
+        
+        btn.addEventListener("click", function() {
+            changeAbility(pkmnId, abilityId);
+            closeAbilitySelector();
+        });
+        
+        listDiv.appendChild(btn);
+    });
+    
+    // Afficher le sélecteur
+    document.getElementById("ability-selector").style.display = "block";
+}
+
+function closeAbilitySelector() {
+    document.getElementById("ability-selector").style.display = "none";
+}
+
+function changeAbility(pkmnId, abilityId) {
+    if (!pkmn[pkmnId] || !pkmn[pkmnId].unlockedAbilities.includes(abilityId)) {
+        return;
+    }
+    
+    pkmn[pkmnId].ability = abilityId;
+    
+    // Mettre à jour l'affichage
+    if (currentEditedPkmn === pkmnId) {
+        tooltipData('pkmnEditor', pkmnId);
+    }
+    
+    saveGame();
+}
 
 function closeTooltip() {
 
@@ -1319,7 +1390,13 @@ frontierArray.sort((a, b) => a.data.tier - b.data.tier);
     if (ability[ pkmn[ttdata].ability ].rarity==2) document.getElementById("pkmn-edit-ability").classList.add("ability-uncommon")
     if (ability[ pkmn[ttdata].ability ].rarity==3) document.getElementById("pkmn-edit-ability").classList.add("ability-rare")
     document.getElementById("pkmn-edit-ability").dataset.ability = pkmn[ttdata].ability
-    document.getElementById("pkmn-edit-ability").innerHTML = `<span>${abilityIcon+format(pkmn[ttdata].ability)}</span>${abilityTier}`
+    
+    // Ajouter l'indicateur si d'autres abilités sont débloquées
+    let abilitySwitchIndicator = "";
+    if (pkmn[ttdata].unlockedAbilities && pkmn[ttdata].unlockedAbilities.length > 1) {
+        abilitySwitchIndicator = ` <span style="font-size: 0.8rem; opacity: 0.7;">(+${pkmn[ttdata].unlockedAbilities.length - 1})</span>`;
+    }
+    document.getElementById("pkmn-edit-ability").innerHTML = `<span>${abilityIcon+format(pkmn[ttdata].ability)}${abilitySwitchIndicator}</span>${abilityTier}`
 
 
     document.getElementById("pkmn-stats-lore").style.display = "none"

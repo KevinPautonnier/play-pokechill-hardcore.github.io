@@ -1355,10 +1355,20 @@ Game Guide
 
                     Abilities
                         <span style="display: flex; gap: 1rem;">
-                    <div id="pkmn-edit-ability">
-                        [Coming Soon]</div>
+                    <div id="pkmn-edit-ability" style="cursor: pointer;"
+                        onclick="openAbilitySelector(currentEditedPkmn)">
+                        [Loading...]</div>
                     <div id="pkmn-edit-ability-hidden" >
                         [Coming Soon]</div>
+                </div>
+                
+                <!-- Sélecteur d'abilités débloquées -->
+                <div id="ability-selector" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--dark2); border: 2px solid var(--light1); border-radius: 0.5rem; padding: 1rem; z-index: 1000; max-w: 20rem; box-shadow: 0 0 20px rgba(0,0,0,0.5);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0; color: var(--light2);">Select Ability</h3>
+                        <button onclick="closeAbilitySelector()" style="background: none; border: none; color: var(--light2); font-size: 1.5rem; cursor: pointer;">&times;</button>
+                    </div>
+                    <div id="ability-selector-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 15rem; overflow-y: auto;"></div>
                 </div>
 
                 <div class="pkmn-stats-stat-abilities" id="pkmn-stats-stat-signature">

@@ -161,6 +161,9 @@ function givePkmn(poke, level) {
 
 
     poke.ability = learnPkmnAbility(poke.id);
+    
+    // Initialiser le système de redrop avec abilités débloquées
+    poke.unlockedAbilities = poke.unlockedAbilities || [poke.ability];
 
     if (rng(1/400)) poke.shiny = true
 
@@ -1146,7 +1149,12 @@ function leaveCombat(){
         pkmn[i].moves.slot1 = newMove 
         pkmn[i].ability = learnPkmnAbility(pkmn[i].id)    
         divTag = `<span>New!</span>`
-    } 
+    } else { // Redrop - unlock a new ability
+        const unlockedAbility = unlockRedropAbility(pkmn[i]);
+        if (unlockedAbility) {
+            divTag = `<span>Redrop + Ability!</span>`
+        }
+    }
 
 
     if (rng(shinyPkmnChanceEncounter)){ //shiny
