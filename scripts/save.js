@@ -79,6 +79,7 @@ function saveGame() {
   }
 
   localStorage.setItem("gameData", JSON.stringify(data));
+  localStorage.setItem("gameDataUpdatedAt", new Date().toISOString());
 }
 
 // ---- CARGAR ----
@@ -334,3 +335,361 @@ function clearData() {
   localStorage.clear();
   window.location.reload();
 }
+
+// ------------------------------
+// Cloud save (Google Drive appDataFolder)
+// ------------------------------
+
+// drive.appdata = store save in the user's hidden app data space (no access to full Drive)
+// openid/email = lets us display "signed in as user@gmail.com" in Settings
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata openid email";
+const DRIVE_SAVE_FILENAME = "pokechill-save.json";
+
+// Create a Google Cloud OAuth Client ID (Web application), then replace this value.
+// Authorized JavaScript origins should include: https://kevinpautonnier.github.io
+const GOOGLE_OAUTH_CLIENT_ID = "126057060733-k07jkqvsnvc18gifbhjurrvaqjj2hr2o.apps.googleusercontent.com";
+
+let driveTokenClient = null;
+let driveAccessToken = null;
+let driveAccessTokenExpiresAtMs = 0;
+let driveUserEmail = null;
+
+function drivePersistSession() {
+  try {
+    if (driveAccessToken) {
+      sessionStorage.setItem("driveAccessToken", driveAccessToken);
+      sessionStorage.setItem("driveAccessTokenExpiresAtMs", String(driveAccessTokenExpiresAtMs || 0));
+    } else {
+      sessionStorage.removeItem("driveAccessToken");
+      sessionStorage.removeItem("driveAccessTokenExpiresAtMs");
+    }
+
+    if (driveUserEmail) {
+      sessionStorage.setItem("driveUserEmail", driveUserEmail);
+    } else {
+      sessionStorage.removeItem("driveUserEmail");
+    }
+  } catch (_) {}
+}
+
+function driveRestoreSessionFromStorage() {
+  try {
+    const token = sessionStorage.getItem("driveAccessToken");
+    const exp = Number(sessionStorage.getItem("driveAccessTokenExpiresAtMs") || "0");
+    const email = sessionStorage.getItem("driveUserEmail");
+
+    if (token && exp && exp > Date.now() + 30_000) {
+      driveAccessToken = token;
+      driveAccessTokenExpiresAtMs = exp;
+      if (email) driveUserEmail = email;
+      driveSetStatusLabel();
+      return true;
+    }
+  } catch (_) {}
+
+  return false;
+}
+
+function driveSetStatusLabel() {
+  const el = document.getElementById("drive-cloud-label");
+  if (!el) return;
+
+  if (driveUserEmail) {
+    el.textContent = `Cloud Save (Google Drive) — ${driveUserEmail}`;
+  } else {
+    el.textContent = "Cloud Save (Google Drive)";
+  }
+}
+
+async function driveFetchUserEmail() {
+  // Requires scopes: openid + email
+  const resp = await driveAuthedFetch("https://openidconnect.googleapis.com/v1/userinfo");
+  if (!resp.ok) throw new Error(`userinfo failed (${resp.status})`);
+  const data = await resp.json();
+  const email = data?.email;
+  if (typeof email === "string" && email.includes("@")) {
+    driveUserEmail = email;
+    driveSetStatusLabel();
+    drivePersistSession();
+  }
+}
+
+function driveIsConfigured() {
+  return GOOGLE_OAUTH_CLIENT_ID && GOOGLE_OAUTH_CLIENT_ID !== "REPLACE_ME_GOOGLE_CLIENT_ID";
+}
+
+function driveEnsureSdkReady({ silent = false } = {}) {
+  if (!driveIsConfigured()) {
+    if (!silent) alert("Cloud Save is not configured. Set GOOGLE_OAUTH_CLIENT_ID in scripts/save.js.");
+    return false;
+  }
+
+  if (!window.google?.accounts?.oauth2?.initTokenClient) {
+    if (!silent) alert("Google Sign-In SDK not loaded yet. Please retry in a second.");
+    return false;
+  }
+
+  if (!driveTokenClient) {
+    driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_OAUTH_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: () => {},
+    });
+  }
+
+  return true;
+}
+
+async function driveEnsureToken({ interactive, silent = false }) {
+  if (!driveEnsureSdkReady({ silent })) return null;
+
+  const now = Date.now();
+  if (driveAccessToken && driveAccessTokenExpiresAtMs - now > 30_000) {
+    return driveAccessToken;
+  }
+
+  return await new Promise((resolve, reject) => {
+    driveTokenClient.callback = (resp) => {
+      if (!resp || resp.error) {
+        reject(resp);
+        return;
+      }
+
+      driveAccessToken = resp.access_token;
+      const expiresInSec = Number(resp.expires_in || 0);
+      driveAccessTokenExpiresAtMs = Date.now() + Math.max(0, expiresInSec - 5) * 1000;
+      drivePersistSession();
+      resolve(driveAccessToken);
+    };
+
+    // For silent refresh, GIS expects prompt: "" (empty). "none" is not consistently accepted.
+    driveTokenClient.requestAccessToken({ prompt: interactive ? "consent" : "" });
+  });
+}
+
+async function driveAuthedFetch(url, init = {}) {
+  const token = await driveEnsureToken({ interactive: false }).catch(async () => {
+    return await driveEnsureToken({ interactive: true });
+  });
+
+  if (!token) throw new Error("No access token");
+
+  const headers = new Headers(init.headers || {});
+  headers.set("Authorization", `Bearer ${token}`);
+
+  return await fetch(url, { ...init, headers });
+}
+
+function driveGetLocalUpdatedAt() {
+  return localStorage.getItem("gameDataUpdatedAt");
+}
+
+async function driveFindSaveFile() {
+  const url =
+    "https://www.googleapis.com/drive/v3/files" +
+    `?spaces=appDataFolder&q=${encodeURIComponent("name='" + DRIVE_SAVE_FILENAME + "' and trashed=false")}` +
+    "&fields=files(id,name,modifiedTime,size)";
+
+  const resp = await driveAuthedFetch(url);
+  if (!resp.ok) throw new Error(`Drive list failed (${resp.status})`);
+
+  const data = await resp.json();
+  const file = data?.files?.[0];
+  return file || null;
+}
+
+async function driveCreateSaveFile(rawJson) {
+  const boundary = "pokechill_boundary_" + Math.random().toString(16).slice(2);
+  const metadata = {
+    name: DRIVE_SAVE_FILENAME,
+    parents: ["appDataFolder"],
+    mimeType: "application/json",
+  };
+
+  const body =
+    `--${boundary}\r\n` +
+    "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+    `${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\n` +
+    "Content-Type: application/json\r\n\r\n" +
+    `${rawJson}\r\n` +
+    `--${boundary}--`;
+
+  const resp = await driveAuthedFetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime",
+    {
+      method: "POST",
+      headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+      body,
+    }
+  );
+
+  if (!resp.ok) throw new Error(`Drive create failed (${resp.status})`);
+  return await resp.json();
+}
+
+async function driveUpdateSaveFile(fileId, rawJson) {
+  const resp = await driveAuthedFetch(
+    `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=media&fields=id,modifiedTime`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: rawJson,
+    }
+  );
+
+  if (!resp.ok) throw new Error(`Drive update failed (${resp.status})`);
+  return await resp.json();
+}
+
+async function driveDownloadSaveFile(fileId) {
+  const resp = await driveAuthedFetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+    { method: "GET" }
+  );
+
+  if (!resp.ok) throw new Error(`Drive download failed (${resp.status})`);
+  return await resp.text();
+}
+
+async function driveSignIn() {
+  if (!driveEnsureSdkReady()) return;
+
+  try {
+    await driveEnsureToken({ interactive: true });
+    await driveFetchUserEmail();
+    alert("Signed in. You can now Upload/Download your cloud save.");
+  } catch (err) {
+    console.error(err);
+    alert("Sign-in failed.");
+  }
+}
+
+function driveSignOut() {
+  if (!driveAccessToken) {
+    alert("Not signed in.");
+    return;
+  }
+
+  const tokenToRevoke = driveAccessToken;
+  driveAccessToken = null;
+  driveAccessTokenExpiresAtMs = 0;
+
+  try {
+    google?.accounts?.oauth2?.revoke?.(tokenToRevoke, () => {});
+  } catch (_) {}
+
+  driveUserEmail = null;
+  driveSetStatusLabel();
+  drivePersistSession();
+  alert("Signed out.");
+}
+
+async function driveUpload() {
+  if (!driveEnsureSdkReady()) return;
+
+  try {
+    saveGame();
+
+    const raw = exportToText();
+    if (!raw) {
+      alert("No local save found to upload.");
+      return;
+    }
+
+    if (!driveUserEmail) {
+      await driveFetchUserEmail().catch(() => {});
+    }
+
+    const localUpdatedAt = driveGetLocalUpdatedAt();
+    const existing = await driveFindSaveFile();
+
+    if (existing?.modifiedTime) {
+      const msg =
+        "Overwrite cloud save?\n\n" +
+        `Cloud last update: ${existing.modifiedTime}\n` +
+        (localUpdatedAt ? `Local last update: ${localUpdatedAt}\n` : "");
+      if (!confirm(msg)) return;
+      await driveUpdateSaveFile(existing.id, raw);
+    } else {
+      await driveCreateSaveFile(raw);
+    }
+
+    alert("Uploaded to Google Drive (cloud save updated).");
+  } catch (err) {
+    console.error(err);
+    alert("Upload failed.");
+  }
+}
+
+async function driveDownload() {
+  if (!driveEnsureSdkReady()) return;
+
+  try {
+    const existing = await driveFindSaveFile();
+    if (!existing) {
+      alert("No cloud save found yet.");
+      return;
+    }
+
+    if (!driveUserEmail) {
+      await driveFetchUserEmail().catch(() => {});
+    }
+
+    const localUpdatedAt = driveGetLocalUpdatedAt();
+    const msg =
+      "Replace local save with cloud save?\n\n" +
+      `Cloud last update: ${existing.modifiedTime || "unknown"}\n` +
+      (localUpdatedAt ? `Local last update: ${localUpdatedAt}\n` : "");
+    if (!confirm(msg)) return;
+
+    const raw = await driveDownloadSaveFile(existing.id);
+    JSON.parse(raw); // validate
+
+    localStorage.setItem("gameData", raw);
+    localStorage.setItem("gameDataUpdatedAt", new Date().toISOString());
+    loadGame();
+    window.location.reload();
+  } catch (err) {
+    console.error(err);
+    alert("Download failed.");
+  }
+}
+
+async function driveTryRestoreSession() {
+  if (!driveIsConfigured()) return;
+  // First: restore from sessionStorage (works on F5 in same tab).
+  const restored = driveRestoreSessionFromStorage();
+
+  const startMs = Date.now();
+  const maxWaitMs = 10_000;
+
+  const tick = async () => {
+    // Wait for the GIS script to load (it's async/defer in index.html)
+    if (!window.google?.accounts?.oauth2?.initTokenClient) {
+      if (Date.now() - startMs < maxWaitMs) setTimeout(tick, 250);
+      return;
+    }
+
+    // Silent token request: no popup, no consent prompt.
+    try {
+      await driveEnsureToken({ interactive: false, silent: true });
+      await driveFetchUserEmail();
+    } catch (_) {
+      // Not signed in / no prior consent / third-party cookie restrictions, etc.
+    }
+  };
+
+  // If we already restored a still-valid token, we can skip GIS silent auth,
+  // but still try to re-fetch email if missing.
+  if (restored && driveUserEmail) return;
+  tick();
+}
+
+// Initialize label + attempt silent re-auth on refresh.
+try {
+  driveSetStatusLabel();
+  window.addEventListener("load", () => {
+    driveTryRestoreSession();
+  });
+} catch (_) {}

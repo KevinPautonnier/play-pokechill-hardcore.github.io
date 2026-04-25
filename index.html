@@ -468,6 +468,11 @@
             <div onclick="exportData()">Export Data</div>
             <div onclick="importData()">Import Data</div>
             <div onclick="textData()">Data to Text</div>
+            <div id="drive-cloud-label" style="pointer-events:none; opacity:0.8; margin-top:0.6rem;">Cloud Save (Google Drive)</div>
+            <div onclick="driveSignIn()">Google Drive: Sign in</div>
+            <div onclick="driveUpload()">Google Drive: Upload</div>
+            <div onclick="driveDownload()">Google Drive: Download</div>
+            <div onclick="driveSignOut()" style="margin-bottom:0.6rem;">Google Drive: Sign out</div>
 
             <div>Theme: <select id="settings-theme">
                 <option value="default">default</option>
@@ -1741,6 +1746,7 @@ Game Guide
     <script src="scripts/dictionarySearch.js"></script>
     <script src="scripts/tooltip.js"></script>
     <script src="scripts/decor.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script src="scripts/save.js"></script>
 </body>
