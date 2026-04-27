@@ -2278,6 +2278,53 @@ let zCrystalTurn = 0
 let lastCrossStab = undefined
 const crossPattern = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='white' fill-opacity='1'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
 
+let pokedexCompletionMultiplier = 0.001
+
+function getPokedexAttackBonusMultiplier(){
+    try {
+        if (pkmn == undefined) return 1
+        let gotPokemon = 0
+        for (const i in pkmn) {
+            if (pkmn[i]?.caught > 0) gotPokemon++
+        }
+        return 1 + (gotPokemon * pokedexCompletionMultiplier)
+    } catch {
+        return 1
+    }
+}
+
+function getPokedexCaughtCount(){
+    try {
+        if (pkmn == undefined) return 0
+        let gotPokemon = 0
+        for (const i in pkmn) {
+            if (pkmn[i]?.caught > 0) gotPokemon++
+        }
+        return gotPokemon
+    } catch {
+        return 0
+    }
+}
+
+function updatePokedexMultiplierDisplay(){
+    const el = document.getElementById("explore-pokedex-multiplier")
+    if (!el) return
+
+    // Ensure class is present even if the element was moved in the DOM
+    el.classList.add("explore-pokedex-multiplier")
+
+    if (saved?.currentArea == undefined || saved?.currentPkmn == undefined) {
+        el.classList.add("is-hidden")
+        return
+    }
+
+    const caughtCount = getPokedexCaughtCount()
+    const mult = 1 + (caughtCount * pokedexCompletionMultiplier)
+
+    el.classList.remove("is-hidden")
+
+    el.innerHTML = `Pokedex bonus dégats: x${mult}`
+}
 
 function exploreCombatPlayer() {
 
@@ -2428,6 +2475,8 @@ function exploreCombatPlayer() {
         let totalPower = 0
         const attacker = pkmn[ team[exploreActiveMember].pkmn.id ]
         const defender = pkmn[ saved.currentPkmn ]
+        const pokedexAttackBonusMultiplier = getPokedexAttackBonusMultiplier()
+        updatePokedexMultiplierDisplay()
 
 
         
@@ -2895,6 +2944,8 @@ function exploreCombatPlayer() {
 
             zTotalPower *= zTypeMultiplier
 
+            if (zTotalPower > 0) zTotalPower *= pokedexAttackBonusMultiplier
+
 
             if (team[member].damageDealt==undefined||team[member].damageDealt==NaN) team[member].damageDealt = 0
             team[member].damageDealt += Math.min(zTotalPower, wildPkmnHp)
@@ -2994,6 +3045,8 @@ function exploreCombatPlayer() {
 
 
 
+
+        if (totalPower > 0) totalPower *= pokedexAttackBonusMultiplier
 
         if (team[exploreActiveMember].damageDealt==undefined||team[exploreActiveMember].damageDealt==NaN) team[exploreActiveMember].damageDealt = 0
         team[exploreActiveMember].damageDealt += Math.min(totalPower, wildPkmnHp)
