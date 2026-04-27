@@ -480,6 +480,22 @@ async function driveAuthedFetch(url, init = {}) {
   return await fetch(url, { ...init, headers });
 }
 
+async function driveReadErrorBody(resp) {
+  try {
+    const text = await resp.text();
+    if (!text) return "";
+    // Google APIs often return JSON error payloads; try to compact it.
+    try {
+      const json = JSON.parse(text);
+      return JSON.stringify(json);
+    } catch (_) {
+      return text.slice(0, 800);
+    }
+  } catch (_) {
+    return "";
+  }
+}
+
 function driveGetLocalUpdatedAt() {
   return localStorage.getItem("gameDataUpdatedAt");
 }
@@ -491,7 +507,10 @@ async function driveFindSaveFile() {
     "&fields=files(id,name,modifiedTime,size)";
 
   const resp = await driveAuthedFetch(url);
-  if (!resp.ok) throw new Error(`Drive list failed (${resp.status})`);
+  if (!resp.ok) {
+    const body = await driveReadErrorBody(resp);
+    throw new Error(`Drive list failed (${resp.status}) ${body}`);
+  }
 
   const data = await resp.json();
   const file = data?.files?.[0];
@@ -524,7 +543,10 @@ async function driveCreateSaveFile(rawJson) {
     }
   );
 
-  if (!resp.ok) throw new Error(`Drive create failed (${resp.status})`);
+  if (!resp.ok) {
+    const bodyText = await driveReadErrorBody(resp);
+    throw new Error(`Drive create failed (${resp.status}) ${bodyText}`);
+  }
   return await resp.json();
 }
 
@@ -538,7 +560,10 @@ async function driveUpdateSaveFile(fileId, rawJson) {
     }
   );
 
-  if (!resp.ok) throw new Error(`Drive update failed (${resp.status})`);
+  if (!resp.ok) {
+    const bodyText = await driveReadErrorBody(resp);
+    throw new Error(`Drive update failed (${resp.status}) ${bodyText}`);
+  }
   return await resp.json();
 }
 
@@ -548,7 +573,10 @@ async function driveDownloadSaveFile(fileId) {
     { method: "GET" }
   );
 
-  if (!resp.ok) throw new Error(`Drive download failed (${resp.status})`);
+  if (!resp.ok) {
+    const bodyText = await driveReadErrorBody(resp);
+    throw new Error(`Drive download failed (${resp.status}) ${bodyText}`);
+  }
   return await resp.text();
 }
 
@@ -561,7 +589,7 @@ async function driveSignIn() {
     alert("Signed in. You can now Upload/Download your cloud save.");
   } catch (err) {
     console.error(err);
-    alert("Sign-in failed.");
+    alert(`Sign-in failed.\n\n${err?.message || err}`);
   }
 }
 
@@ -618,7 +646,7 @@ async function driveUpload() {
     alert("Uploaded to Google Drive (cloud save updated).");
   } catch (err) {
     console.error(err);
-    alert("Upload failed.");
+    alert(`Upload failed.\n\n${err?.message || err}`);
   }
 }
 
@@ -652,7 +680,7 @@ async function driveDownload() {
     window.location.reload();
   } catch (err) {
     console.error(err);
-    alert("Download failed.");
+    alert(`Download failed.\n\n${err?.message || err}`);
   }
 }
 
