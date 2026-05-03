@@ -1083,7 +1083,12 @@ function leaveCombat(){
         pkmn[hatchedPkmn].moves.slot1 = newMove 
         pkmn[hatchedPkmn].ability = learnPkmnAbility(pkmn[hatchedPkmn].id)    
         divTag = `<span>New!</span>`
-    } 
+    } else { // Redrop - unlock a new ability
+        const unlockedAbility = unlockRedropAbility(pkmn[hatchedPkmn]);
+        if (unlockedAbility) {
+            divTag = `<span>Redrop + Ability!</span>`
+        }
+    }
 
 
     if (rng(shinyPkmnChance) && pkmn[hatchedPkmn].shiny!=true){ //shiny
