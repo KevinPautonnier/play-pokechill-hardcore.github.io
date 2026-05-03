@@ -106,6 +106,15 @@ function arrayPick(array, n = 1, seed) {
   return n === 1 ? picks[0] : picks;
 }
 
+function maybeUnlockRedropAbilityTag(pkmn_obj, tagText = "New ability") {
+    if (typeof unlockRedropAbility !== "function") return ""
+    const before = new Set(pkmn_obj?.unlockedAbilities || [])
+    const unlockedAbility = unlockRedropAbility(pkmn_obj)
+    if (!unlockedAbility) return ""
+    if (before.has(unlockedAbility)) return ""
+    return `<span>${tagText}</span>`
+}
+
 
 function mulberry32(a) {
   return function() {
@@ -1084,10 +1093,8 @@ function leaveCombat(){
         pkmn[hatchedPkmn].ability = learnPkmnAbility(pkmn[hatchedPkmn].id)    
         divTag = `<span>New!</span>`
     } else { // Redrop - unlock a new ability
-        const unlockedAbility = unlockRedropAbility(pkmn[hatchedPkmn]);
-        if (unlockedAbility) {
-            divTag = `<span>Redrop + Ability!</span>`
-        }
+        const tag = maybeUnlockRedropAbilityTag(pkmn[hatchedPkmn])
+        if (tag) divTag = tag
     }
 
 
@@ -1155,10 +1162,8 @@ function leaveCombat(){
         pkmn[i].ability = learnPkmnAbility(pkmn[i].id)    
         divTag = `<span>New!</span>`
     } else { // Redrop - unlock a new ability
-        const unlockedAbility = unlockRedropAbility(pkmn[i]);
-        if (unlockedAbility) {
-            divTag = `<span>Redrop + Ability!</span>`
-        }
+        const tag = maybeUnlockRedropAbilityTag(pkmn[i])
+        if (tag) divTag = tag
     }
 
 
