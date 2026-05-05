@@ -43,6 +43,11 @@ const isIOS = (() => {
 
 
 
+saved.activeTraining = undefined
+saved.trainingTimer = 0
+
+
+
 //--Updates game version, used for firing retroactive features
 saved.version = undefined
 function updateGameVersion() {

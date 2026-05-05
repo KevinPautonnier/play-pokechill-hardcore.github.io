@@ -1847,11 +1847,7 @@ for (const i in team) {
 
             }
 
-
-
-
-
-        }
+    updateTrainingIndicator();
 
 
         
@@ -2231,6 +2227,20 @@ function gameLoop(now) {
         stepsExecuted++;
 
 
+    }
+
+    if (saved.activeTraining) {
+        saved.trainingTimer += delta / 1000;
+        if (saved.trainingTimer > 5 * training[saved.activeTraining].tier) {
+            if (training[saved.activeTraining].condition()) {
+                training[saved.activeTraining].effect();
+                saved.trainingTimer = 0;
+            } else {
+                saved.activeTraining = undefined;
+                saved.trainingTimer = 0;
+                updateTrainingIndicator();
+            }
+        }
     }
 
     requestAnimationFrame(gameLoop);
@@ -6529,21 +6539,9 @@ function switchMenu(id){
 
     if (id==="training") {
 
-        if (saved.currentArea!==undefined && saved.currentArea!= areas.training.id) {openMenu(); return; }
-
-        if (saved.currentArea==undefined) {
         document.getElementById(`training-menu`).style.display = "flex"
         document.getElementById(`training-menu`).style.zIndex = "40"
         setTrainingMenu()
-        }
-
-        else {
-        setTimeout(() => {
-        document.getElementById(`content-explore`).style.display = "flex"
-        document.getElementById(`content-explore`).style.zIndex = "40"         
-        }, 1);
-        }
-
 
     } 
 
@@ -8982,8 +8980,7 @@ training.level = {
 
         
 
-        for (let i = 0; i < 101; i++) {
-        if (pkmn[saved.trainingPokemon].level >= 100) continue
+        if (pkmn[saved.trainingPokemon].level >= 100) return
         pkmn[saved.trainingPokemon].level++
 
         let learntMove = learnPkmnMove(pkmn[saved.trainingPokemon].id, pkmn[saved.trainingPokemon].level)
@@ -8991,8 +8988,7 @@ training.level = {
         if (pkmn[ saved.trainingPokemon ].level % 7 === 0) pkmn[ saved.trainingPokemon ].movepool.push(learntMove)
 
         }
-        }
-
+        
 
         //this really should be a function huh 2.0
         if (pkmn[ saved.trainingPokemon ].evolve && pkmn[saved.trainingPokemon].evolve()[1].level>0){ // if it evolves by level up
@@ -9016,7 +9012,7 @@ training.level = {
 
 training.iv1 = { //disapears if you have more than x ivs
     name: `IV Training I`,
-    info: `Gain 2 random IV stars. Can only be done with less than 10 IV stars`,
+    info: `Gain 1 random IV star. Can only be done with less than 10 IV stars`,
     tier: 1,
     color: `#699edf`,
     condition: function() {
@@ -9028,10 +9024,10 @@ training.iv1 = { //disapears if you have more than x ivs
     effect: function() {
         
     const i = saved.trainingPokemon
-    const cap = 2
+    const cap = 1
     const stats = Object.keys(pkmn[i].ivs);
     const increases = {};
-    let points = 2;
+    let points = 1;
 
     while (points > 0) {
         const available = stats.filter(
@@ -9070,7 +9066,7 @@ training.iv1 = { //disapears if you have more than x ivs
 
 training.iv2 = { //doesnt appear until you have more than x ivs
     name: `IV Training II`,
-    info: `Gain 2 random IV stars. Can only be done with less than 22 IV stars`,
+    info: `Gain 1 random IV star. Can only be done with less than 22 IV stars`,
     tier: 2,
     color: `#699edf`,
     condition: function() {
@@ -9085,7 +9081,7 @@ training.iv2 = { //doesnt appear until you have more than x ivs
     const cap = 4
     const stats = Object.keys(pkmn[i].ivs);
     const increases = {};
-    let points = 2;
+    let points = 1;
 
     while (points > 0) {
         const available = stats.filter(
@@ -9381,33 +9377,15 @@ function setTrainingMenu() {
 
 
         if (training[i].condition && training[i].condition()!=true) return
-        areas.training.tier = training[i].tier
-        areas.training.currentTraining = i
-        afkSeconds = 0
-        document.getElementById(`explore-menu`).style.display = `none`
+        const progressive = ['level', 'iv1', 'iv2', 'iv3'];
 
-        div.style.pointerEvents = "none"
-
-
-    for ( const slot in team){
-    team[slot].pkmn = undefined
-    team[slot].item = undefined
-    }
-
-    team.slot1.pkmn = pkmn[saved.trainingPokemon]
-
-        
-    voidAnimation(`explore-transition`, `exploreTransition 1s 1`)
-    document.getElementById(`explore-transition`).style.display = `flex`
-
-
-    setTimeout(() => {
-        saved.currentArea = areas.training.id
-        saved.lastAreaJoined = areas.training.id
-        document.getElementById("content-explore").style.display = "flex"
-        document.getElementById(`training-menu`).style.display = `none`;
-        initialiseArea()
-    }, 500);
+        if (progressive.includes(i)) {
+            saved.activeTraining = i;
+            saved.trainingTimer = 0;
+            updateTrainingIndicator();
+        } else {
+            training[i].effect();
+        }
 
     })
         
@@ -9419,6 +9397,15 @@ function setTrainingMenu() {
 
 
 
+}
+
+function updateTrainingIndicator() {
+    if (saved.activeTraining) {
+        document.getElementById('training-indicator').style.display = 'flex'
+        document.getElementById('training-indicator-counter').textContent = training[saved.activeTraining].name
+    } else {
+        document.getElementById('training-indicator').style.display = 'none'
+    }
 }
 
 setTrainingMenu()

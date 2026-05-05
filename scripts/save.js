@@ -92,6 +92,7 @@ function loadGame() {
   const data = JSON.parse(raw);
 
   if (data.saved !== undefined) saved = data.saved;
+  updateTrainingIndicator();
   if (data.team !== undefined) team = data.team;
 
   for (const i in item) {
